@@ -13,6 +13,9 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
+    - name: Setup MSVC Environment
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Download DirectX 9 SDK
       run: |
         Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.DXSDK.D3DX/9.29.952.8" -OutFile "dxsdk.zip"
