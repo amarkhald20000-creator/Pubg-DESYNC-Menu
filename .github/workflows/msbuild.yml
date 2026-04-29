@@ -21,33 +21,17 @@ jobs:
         Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.DXSDK.D3DX/9.29.952.8" -OutFile "dxsdk.zip"
         Expand-Archive -Path "dxsdk.zip" -DestinationPath "dxsdk"
 
-    - name: Inject Library Paths and Build
+    - name: Build the project
       run: |
-        # 1. Find the project file
         $proj = Get-ChildItem -Filter *.vcxproj -Recurse | Select-Object -First 1
-        
-        # 2. Get DirectX paths
         $dxInclude = (Get-ChildItem -Path dxsdk -Filter d3dx9.h -Recurse).Directory.FullName
         $dxLib = (Get-ChildItem -Path dxsdk -Filter d3dx9.lib -Recurse | Where-Object { $_.FullName -match "x64" }).Directory.FullName | Select-Object -First 1
         
-        # 3. Find the exact path for Windows SDK (kernel32.lib)
-        $winSdkLibPath = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\Lib" -Filter "kernel32.lib" -Recurse | Where-Object { $_.FullName -match "x64" } | Sort-Object FullName -Descending | Select-Object -First 1).Directory.FullName
+        # الحقن الآمن في متغيرات بيئة الويندوز مباشرة
+        $env:INCLUDE = "$dxInclude;$env:INCLUDE"
+        $env:LIB = "$dxLib;$env:LIB"
         
-        # 4. Inject ALL paths into the build properties
-        $props = @"
-        <Project>
-          <PropertyGroup>
-            <IncludePath>$dxInclude;`$(IncludePath)</IncludePath>
-            <LibraryPath>$dxLib;$winSdkLibPath;`$(LibraryPath)</LibraryPath>
-          </PropertyGroup>
-        </Project>
-        "@
-        Set-Content -Path Directory.Build.props -Value $props
-        
-        Write-Host "Injected WinSDK Path: $winSdkLibPath"
         Write-Host "Building project: $($proj.FullName)"
-        
-        # 5. Build!
         msbuild "$($proj.FullName)" /m /p:Configuration=Release /p:Platform=x64
 
     - name: Upload EXE Artifact
