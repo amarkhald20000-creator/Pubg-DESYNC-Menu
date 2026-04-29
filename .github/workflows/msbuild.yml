@@ -21,15 +21,26 @@ jobs:
         Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.DXSDK.D3DX/9.29.952.8" -OutFile "dxsdk.zip"
         Expand-Archive -Path "dxsdk.zip" -DestinationPath "dxsdk"
 
-    - name: Build the project
+    - name: Inject Safe Properties and Build
       run: |
         $proj = Get-ChildItem -Filter *.vcxproj -Recurse | Select-Object -First 1
         $dxInclude = (Get-ChildItem -Path dxsdk -Filter d3dx9.h -Recurse).Directory.FullName
         $dxLib = (Get-ChildItem -Path dxsdk -Filter d3dx9.lib -Recurse | Where-Object { $_.FullName -match "x64" }).Directory.FullName | Select-Object -First 1
         
-        # الحقن الآمن في متغيرات بيئة الويندوز مباشرة
-        $env:INCLUDE = "$dxInclude;$env:INCLUDE"
-        $env:LIB = "$dxLib;$env:LIB"
+        # الحقن الآمن الذي يضيف المسارات ولا يمسح الأساسيات
+        $props = @"
+        <Project xmlns=`"http://schemas.microsoft.com/developer/msbuild/2003`">
+          <ItemDefinitionGroup>
+            <ClCompile>
+              <AdditionalIncludeDirectories>$dxInclude;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+            </ClCompile>
+            <Link>
+              <AdditionalLibraryDirectories>$dxLib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+            </Link>
+          </ItemDefinitionGroup>
+        </Project>
+        "@
+        Set-Content -Path Directory.Build.props -Value $props
         
         Write-Host "Building project: $($proj.FullName)"
         msbuild "$($proj.FullName)" /m /p:Configuration=Release /p:Platform=x64
